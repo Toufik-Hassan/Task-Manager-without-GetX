@@ -1,0 +1,460 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import '../controllers/task_controller.dart';
+import '../models/task_model.dart';
+import '../theme/app_theme.dart';
+import 'add_edit_task_view.dart';
+
+class HomeView extends GetView<TaskController> {
+  const HomeView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: CustomScrollView(
+        slivers: [
+          // ─── AppBar ───────────────────────────────────────────────────────
+        SliverAppBar(
+        pinned:true,
+            title: const Text('My Tasks', style: TextStyle(fontWeight:FontWeight(500)),),
+            actions: [
+              Obx(() => controller.completedTasks > 0
+                  ? IconButton(
+                tooltip: 'Delete completed',
+                icon: const Icon(Icons.delete_sweep_outlined),
+                onPressed: _confirmDeleteCompleted,
+              )
+                  : const SizedBox.shrink()),
+            ],
+          ),
+
+          // ─── Stats Card ───────────────────────────────────────────────────
+          SliverToBoxAdapter(child: _StatsCard(controller: controller)),
+
+          // ─── Filters ─────────────────────────────────────────────────────
+          SliverToBoxAdapter(child: _FilterRow(controller: controller)),
+
+          // ─── Task List ────────────────────────────────────────────────────
+          Obx(() {
+            final tasks = controller.filteredTasks;
+            if (tasks.isEmpty) {
+              return SliverFillRemaining(
+                child: _EmptyState(filter: controller.selectedFilter.value),
+              );
+            }
+            return SliverList(
+              delegate: SliverChildBuilderDelegate(
+                    (context, i) => _TaskTile(
+                  task: tasks[i],
+                  controller: controller,
+                  colorScheme: cs,
+                  textTheme: tt,
+                ),
+                childCount: tasks.length,
+              ),
+            );
+          }),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 96)),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add Task'),
+        onPressed: () => Get.to(() => const AddEditTaskView()),
+      ),
+    );
+  }
+
+  void _confirmDeleteCompleted() {
+    Get.defaultDialog(
+      title: 'Delete Completed?',
+      middleText:
+      'This will remove all ${controller.completedTasks} completed tasks.',
+      textConfirm: 'Delete',
+      textCancel: 'Cancel',
+      confirmTextColor: Colors.white,
+      buttonColor: Colors.red,
+      onConfirm: () {
+        controller.deleteAllCompleted();
+        Get.back();
+        Get.snackbar(
+          'Done',
+          'Completed tasks deleted',
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(12),
+          duration: const Duration(seconds: 2),
+        );
+      },
+    );
+  }
+}
+
+// ─── Stats Card ─────────────────────────────────────────────────────────────
+
+class _StatsCard extends StatelessWidget {
+  final TaskController controller;
+  const _StatsCard({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Obx(() => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Card(
+        color: cs.primaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _StatChip(
+                    label: 'Total',
+                    value: controller.totalTasks,
+                    color: cs.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  _StatChip(
+                    label: 'Pending',
+                    value: controller.pendingTasks,
+                    color: Colors.orange.shade700,
+                  ),
+                  const SizedBox(width: 12),
+                  _StatChip(
+                    label: 'Done',
+                    value: controller.completedTasks,
+                    color: Colors.green.shade700,
+                  ),
+                ],
+              ),
+              if (controller.totalTasks > 0) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: controller.completionRate,
+                          minHeight: 8,
+                          backgroundColor: cs.onPrimaryContainer
+                              .withOpacity(0.15),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.green.shade600),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${(controller.completionRate * 100).toInt()}%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ));
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  const _StatChip(
+      {required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          '$value',
+          style: TextStyle(
+              fontSize: 24, fontWeight: FontWeight.bold, color: color),
+        ),
+        Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onPrimaryContainer)),
+      ],
+    );
+  }
+}
+
+// ─── Filter Row ──────────────────────────────────────────────────────────────
+
+class _FilterRow extends StatelessWidget {
+  final TaskController controller;
+  const _FilterRow({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() => SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Row(
+        children: [
+          // Status filters
+          ...[
+            (0, 'All'),
+            (1, 'Active'),
+            (2, 'Completed'),
+          ].map((e) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(e.$2),
+              selected: controller.selectedFilter.value == e.$1,
+              onSelected: (_) =>
+              controller.selectedFilter.value = e.$1,
+            ),
+          )),
+          const SizedBox(width: 4),
+          const VerticalDivider(width: 1, indent: 4, endIndent: 4),
+          const SizedBox(width: 12),
+          // Priority filters
+          ...[
+            (-1, 'All Priority'),
+            (2, '🔴 High'),
+            (1, '🟠 Medium'),
+            (0, '🟢 Low'),
+          ].map((e) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(e.$2),
+              selected: controller.selectedPriority.value == e.$1,
+              onSelected: (_) =>
+              controller.selectedPriority.value = e.$1,
+            ),
+          )),
+        ],
+      ),
+    ));
+  }
+}
+
+// ─── Task Tile ───────────────────────────────────────────────────────────────
+
+class _TaskTile extends StatelessWidget {
+  final TaskModel task;
+  final TaskController controller;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
+
+  const _TaskTile({
+    required this.task,
+    required this.controller,
+    required this.colorScheme,
+    required this.textTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final priorityColor = AppTheme.priorityColor(task.priority, colorScheme);
+    final priorityLabel = AppTheme.priorityLabel(task.priority);
+    final priorityIcon = AppTheme.priorityIcon(task.priority);
+
+    return Dismissible(
+      key: Key(task.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.red.shade400,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
+      ),
+      confirmDismiss: (_) async {
+        return await _confirmDelete(context);
+      },
+      onDismissed: (_) => controller.deleteTask(task.id),
+      child: Card(
+        color: task.isCompleted
+            ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
+            : colorScheme.surfaceContainerLow,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Get.to(() => AddEditTaskView(task: task)),
+          child: Padding(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // Checkbox
+                GestureDetector(
+                  onTap: () => controller.toggleTask(task.id),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: task.isCompleted
+                          ? Colors.green.shade500
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: task.isCompleted
+                            ? Colors.green.shade500
+                            : colorScheme.outline,
+                        width: 2,
+                      ),
+                    ),
+                    child: task.isCompleted
+                        ? const Icon(Icons.check_rounded,
+                        color: Colors.white, size: 16)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.title,
+                        style: textTheme.titleMedium?.copyWith(
+                          decoration: task.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: task.isCompleted
+                              ? colorScheme.onSurface.withOpacity(0.4)
+                              : colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (task.description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          task.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.55),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          // Priority Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: priorityColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(priorityIcon,
+                                    size: 13, color: priorityColor),
+                                const SizedBox(width: 4),
+                                Text(
+                                  priorityLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: priorityColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('MMM d').format(task.createdAt),
+                            style: textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right_rounded,
+                    color: colorScheme.onSurface.withOpacity(0.3)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _confirmDelete(BuildContext context) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Task?'),
+        content: Text('Delete "${task.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Empty State ─────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final int filter;
+  const _EmptyState({required this.filter});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final messages = [
+      ('📋', 'No tasks yet', 'Tap + to add your first task'),
+      ('✅', 'All done!', 'No active tasks remaining'),
+      ('🎯', 'Nothing here', 'Complete some tasks first'),
+    ];
+    final (emoji, title, subtitle) = messages[filter.clamp(0, 2)];
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 64)),
+          const SizedBox(height: 16),
+          Text(title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(color: cs.onSurface)),
+          const SizedBox(height: 6),
+          Text(subtitle,
+              style: TextStyle(color: cs.onSurface.withOpacity(0.5))),
+        ],
+      ),
+    );
+  }
+}
