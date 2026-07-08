@@ -1,0 +1,255 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../controllers/task_controller.dart';
+import '../models/task_model.dart';
+import '../theme/app_theme.dart';
+
+class AddEditTaskView extends StatefulWidget {
+  final TaskModel? task;
+  const AddEditTaskView({super.key, this.task});
+
+  @override
+  State<AddEditTaskView> createState() => _AddEditTaskViewState();
+}
+
+class _AddEditTaskViewState extends State<AddEditTaskView> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descCtrl;
+  late int _priority;
+
+  bool get _isEditing => widget.task != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.task?.title ?? '');
+    _descCtrl = TextEditingController(text: widget.task?.description ?? '');
+    _priority = widget.task?.priority ?? 1;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isEditing ? 'Edit Task' : 'New Task'),
+        actions: [
+          if (_isEditing)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Delete',
+              onPressed: _deleteTask,
+            ),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            // ─── Title ───────────────────────────────────────────────────
+            Text('Title', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _titleCtrl,
+              autofocus: !_isEditing,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                hintText: 'What needs to be done?',
+                prefixIcon: Icon(Icons.task_alt_rounded),
+              ),
+              maxLength: 100,
+              validator: (v) =>
+              (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+            ),
+            const SizedBox(height: 20),
+
+            // ─── Description ─────────────────────────────────────────────
+            Text('Description (optional)',
+                style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _descCtrl,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                hintText: 'Add details...',
+                prefixIcon: Icon(Icons.notes_rounded),
+                alignLabelWithHint: true,
+              ),
+              maxLines: 4,
+              maxLength: 500,
+            ),
+            const SizedBox(height: 20),
+
+            // ─── Priority ────────────────────────────────────────────────
+            Text('Priority', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _PriorityButton(
+                  label: 'Low',
+                  icon: AppTheme.priorityIcon(0),
+                  color: AppTheme.priorityColor(0, cs),
+                  isSelected: _priority == 0,
+                  onTap: () => setState(() => _priority = 0),
+                ),
+                const SizedBox(width: 10),
+                _PriorityButton(
+                  label: 'Medium',
+                  icon: AppTheme.priorityIcon(1),
+                  color: AppTheme.priorityColor(1, cs),
+                  isSelected: _priority == 1,
+                  onTap: () => setState(() => _priority = 1),
+                ),
+                const SizedBox(width: 10),
+                _PriorityButton(
+                  label: 'High',
+                  icon: AppTheme.priorityIcon(2),
+                  color: AppTheme.priorityColor(2, cs),
+                  isSelected: _priority == 2,
+                  onTap: () => setState(() => _priority = 2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 40),
+
+            // ─── Save Button ─────────────────────────────────────────────
+            FilledButton.icon(
+              icon: Icon(_isEditing
+                  ? Icons.save_rounded
+                  : Icons.add_task_rounded),
+              label: Text(_isEditing ? 'Save Changes' : 'Add Task',
+                  style: const TextStyle(fontSize: 16)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 54),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: _submit,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    final controller = Get.find<TaskController>();
+
+    if (_isEditing) {
+      controller.editTask(
+        id: widget.task!.id,
+        title: _titleCtrl.text,
+        description: _descCtrl.text,
+        priority: _priority,
+      );
+      Get.back();
+      Get.snackbar(
+        'Updated',
+        'Task updated successfully',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 2),
+      );
+    } else {
+      controller.addTask(
+        title: _titleCtrl.text,
+        description: _descCtrl.text,
+        priority: _priority,
+      );
+      Get.back();
+      Get.snackbar(
+        'Added',
+        'Task added successfully',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 2),
+      );
+    }
+  }
+
+  void _deleteTask() {
+    Get.defaultDialog(
+      title: 'Delete Task?',
+      middleText: 'This action cannot be undone.',
+      textConfirm: 'Delete',
+      textCancel: 'Cancel',
+      confirmTextColor: Colors.white,
+      buttonColor: Colors.red,
+      onConfirm: () {
+        Get.find<TaskController>().deleteTask(widget.task!.id);
+        Get.back(); // close dialog
+        Get.back(); // close edit view
+        Get.snackbar(
+          'Deleted',
+          'Task has been deleted',
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(12),
+          duration: const Duration(seconds: 2),
+        );
+      },
+    );
+  }
+}
+
+class _PriorityButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PriorityButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.15) : Colors.transparent,
+            border: Border.all(
+              color: isSelected ? color : Colors.grey.withOpacity(0.3),
+              width: isSelected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: isSelected ? color : Colors.grey, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? color : Colors.grey,
+                  fontWeight:
+                  isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
