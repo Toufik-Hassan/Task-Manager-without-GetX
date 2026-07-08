@@ -1,0 +1,70 @@
+import 'package:flutter/material.dart';
+
+class AppTheme {
+  static const _seed = Color(0xFF6750A4);
+
+  static ThemeData get light => ThemeData(
+    useMaterial3: true,
+    colorSchemeSeed: _seed,
+    brightness: Brightness.light,
+    fontFamily: 'Roboto',
+    appBarTheme: const AppBarTheme(
+      centerTitle: false,
+      elevation: 0,
+      scrolledUnderElevation: 1,
+    ),
+      cardTheme: CardThemeData(
+      elevation: 0,
+      shape:
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      elevation: 4,
+    ),
+    chipTheme: ChipThemeData(
+      shape:
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding:
+      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    ),
+  );
+
+  // Priority colors
+  static Color priorityColor(int priority, ColorScheme cs) {
+    switch (priority) {
+      case 2:
+        return Colors.red.shade600;
+      case 1:
+        return Colors.orange.shade600;
+      default:
+        return Colors.green.shade600;
+    }
+  }
+
+  static String priorityLabel(int priority) {
+    switch (priority) {
+      case 2:
+        return 'High';
+      case 1:
+        return 'Medium';
+      default:
+        return 'Low';
+    }
+  }
+
+  static IconData priorityIcon(int priority) {
+    switch (priority) {
+      case 2:
+        return Icons.keyboard_double_arrow_up_rounded;
+      case 1:
+        return Icons.drag_handle_rounded;
+      default:
+        return Icons.keyboard_double_arrow_down_rounded;
+    }
+  }
+}
