@@ -1,0 +1,53 @@
+class TaskModel {
+  final String id;
+  final String title;
+  final String description;
+  final bool isCompleted;
+  final int priority; // 0 = Low, 1 = Medium, 2 = High
+  final DateTime createdAt;
+
+  TaskModel({
+    required this.id,
+    required this.title,
+    this.description = '',
+    this.isCompleted = false,
+    this.priority = 1,
+    required this.createdAt,
+  });
+
+  TaskModel copyWith({
+    String? id,
+    String? title,
+    String? description,
+    bool? isCompleted,
+    int? priority,
+    DateTime? createdAt,
+  }) {
+    return TaskModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      isCompleted: isCompleted ?? this.isCompleted,
+      priority: priority ?? this.priority,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'description': description,
+    'isCompleted': isCompleted,
+    'priority': priority,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory TaskModel.fromJson(Map<String, dynamic> json) => TaskModel(
+    id: json['id'],
+    title: json['title'],
+    description: json['description'] ?? '',
+    isCompleted: json['isCompleted'] ?? false,
+    priority: json['priority'] ?? 1,
+    createdAt: DateTime.parse(json['createdAt']),
+  );
+}
